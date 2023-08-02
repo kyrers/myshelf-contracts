@@ -1,12 +1,14 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 pragma solidity ^0.8.21;
 
-import "@openzeppelin/access/Ownable.sol";
-import "./MyshelfCustomERC721.sol";
+import {Ownable} from "@openzeppelin/access/Ownable.sol";
+import {MyshelfCustomERC721} from "./MyshelfCustomERC721.sol";
 
 contract BookRepository is Ownable {
     //Addresses of all books smart contracts
     address[] public bookContracts;
+
+    constructor() Ownable(msg.sender) {}
 
     function deployERC721(
         string memory name,
