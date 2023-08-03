@@ -2,25 +2,33 @@
 pragma solidity ^0.8.21;
 
 import {Ownable} from "@openzeppelin/access/Ownable.sol";
-import {MyshelfCustomERC721} from "./MyshelfCustomERC721.sol";
+import {ERC1155, ERC1155URIStorage} from "@openzeppelin/token/ERC1155/extensions/ERC1155URIStorage.sol";
 
-contract BookRepository is Ownable {
-    //Addresses of all books smart contracts
-    address[] public bookContracts;
+contract BookRepository is Ownable, ERC1155URIStorage {
+    //Mapping of token ID to author
+    mapping(uint256 => address) public bookAuthor;
 
-    constructor() Ownable(msg.sender) {}
+    error NotOwner();
 
-    function deployERC721(
-        string memory name,
-        string memory symbol
-    ) external returns (address newBook) {
-        MyshelfCustomERC721 customContract = new MyshelfCustomERC721(
-            name,
-            symbol
-        );
-        customContract.transferOwnership(msg.sender);
-        return address(customContract);
+    modifier onlyTokenOwner(uint256 id) {
+        if (bookAuthor[id] != msg.sender) {
+            revert NotOwner();
+        }
+        _;
     }
 
-    function deployERC1155() external returns (address newBook) {}
+    constructor() ERC1155("") Ownable(msg.sender) {}
+
+    function publish(string memory uri, uint256 id, uint256 amount) external {
+        _mint(msg.sender, id, amount, "");
+        _setURI(id, uri);
+        bookAuthor[id] = msg.sender;
+    }
+
+    function changeURI(
+        uint256 id,
+        string memory uri
+    ) external onlyTokenOwner(id) {
+        _setURI(id, uri);
+    }
 }
