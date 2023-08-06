@@ -20,9 +20,10 @@ contract BookRepository is Ownable, ERC1155URIStorage {
     constructor() ERC1155("") Ownable(msg.sender) {}
 
     function publish(string memory uri, uint256 id, uint256 amount) external {
+        bookAuthor[id] = msg.sender;
+
         _mint(msg.sender, id, amount, "");
         _setURI(id, uri);
-        bookAuthor[id] = msg.sender;
     }
 
     function changeURI(
