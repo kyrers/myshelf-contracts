@@ -65,7 +65,7 @@ contract BookRepositoryTest is Test {
 
         vm.stopPrank();
         vm.prank(bob);
-        
+
         bookRepository.changeURI(1, "new_uri_bob");
 
         string memory bobURI = bookRepository.uri(1);
@@ -74,5 +74,15 @@ contract BookRepositoryTest is Test {
         vm.expectRevert(abi.encodeWithSignature("NotAuthor()"));
 
         bookRepository.changeURI(2, "not_author");
+    }
+
+    function testBuy() public {
+        vm.startPrank(bob);
+
+        bookRepository.publish("fake_uri", 1, 10);
+        bookRepository.buyBook(1);
+
+        uint256 balance = bookRepository.balanceOf(bob, 1);
+        assertEq(balance, 1);
     }
 }

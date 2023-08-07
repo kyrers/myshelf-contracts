@@ -13,11 +13,8 @@ contract BookRepository is Ownable, ERC1155URIStorage, ERC1155Holder {
 
     constructor() ERC1155("") Ownable(msg.sender) {}
 
-    function publish(string memory uri, uint256 id, uint256 amount) external {
-        bookAuthor[id] = msg.sender;
-
-        _mint(address(this), id, amount, "");
-        _setURI(id, uri);
+    function buyBook(uint256 id) external {
+        _safeTransferFrom(address(this), msg.sender, id, 1, "");
     }
 
     function changeURI(uint256 id, string memory uri) external {
@@ -25,6 +22,13 @@ contract BookRepository is Ownable, ERC1155URIStorage, ERC1155Holder {
             revert NotAuthor();
         }
 
+        _setURI(id, uri);
+    }
+
+    function publish(string memory uri, uint256 id, uint256 amount) external {
+        bookAuthor[id] = msg.sender;
+
+        _mint(address(this), id, amount, "");
         _setURI(id, uri);
     }
 
