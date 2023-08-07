@@ -28,14 +28,14 @@ contract BookRepositoryTest is Test {
         vm.prank(bob);
 
         vm.expectEmit();
-        emit TransferSingle(bob, address(0), bob, 1, 10);
+        emit TransferSingle(bob, address(0), address(bookRepository), 1, 10);
 
         bookRepository.publish("fake_uri", 1, 10);
 
         address author = bookRepository.bookAuthor(1);
         assertEq(author, bob);
 
-        uint256 balance = bookRepository.balanceOf(bob, 1);
+        uint256 balance = bookRepository.balanceOf(address(bookRepository), 1);
         assertEq(balance, 10);
 
         string memory uri = bookRepository.uri(1);
@@ -46,13 +46,13 @@ contract BookRepositoryTest is Test {
         vm.prank(bob);
         vm.expectEmit();
 
-        emit TransferSingle(bob, address(0), bob, 1, 10);
+        emit TransferSingle(bob, address(0), address(bookRepository), 1, 10);
         bookRepository.publish("fake_uri", 1, 10);
 
         vm.startPrank(alice);
         vm.expectEmit();
 
-        emit TransferSingle(alice, address(0), alice, 2, 10);
+        emit TransferSingle(alice, address(0), address(bookRepository), 2, 10);
         bookRepository.publish("fake_uri_alice", 2, 10);
 
         bookRepository.changeURI(2, "new_uri_alice");
@@ -60,8 +60,8 @@ contract BookRepositoryTest is Test {
         string memory aliceURI = bookRepository.uri(2);
         assertEq("new_uri_alice", aliceURI);
 
-        vm.expectRevert(abi.encodeWithSignature("NotOwner()"));
-        bookRepository.changeURI(1, "not_owner");
+        vm.expectRevert(abi.encodeWithSignature("NotAuthor()"));
+        bookRepository.changeURI(1, "not_author");
 
         vm.stopPrank();
         vm.prank(bob);
@@ -71,8 +71,8 @@ contract BookRepositoryTest is Test {
         string memory bobURI = bookRepository.uri(1);
         assertEq("new_uri_bob", bobURI);
 
-        vm.expectRevert(abi.encodeWithSignature("NotOwner()"));
+        vm.expectRevert(abi.encodeWithSignature("NotAuthor()"));
 
-        bookRepository.changeURI(2, "not_owner");
+        bookRepository.changeURI(2, "not_author");
     }
 }
