@@ -26,6 +26,10 @@ contract BookRepository is Ownable, ERC1155URIStorage, ERC1155Holder {
     }
 
     function publish(string memory uri, uint256 id, uint256 amount) external {
+        if (bookAuthor[id] != msg.sender && bookAuthor[id] != address(0)) {
+            revert NotAuthor();
+        }
+        
         bookAuthor[id] = msg.sender;
 
         _mint(address(this), id, amount, "");

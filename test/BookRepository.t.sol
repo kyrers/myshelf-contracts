@@ -26,10 +26,9 @@ contract BookRepositoryTest is Test {
 
     function testPublish() public {
         vm.prank(bob);
-
         vm.expectEmit();
-        emit TransferSingle(bob, address(0), address(bookRepository), 1, 10);
 
+        emit TransferSingle(bob, address(0), address(bookRepository), 1, 10);
         bookRepository.publish("fake_uri", 1, 10);
 
         address author = bookRepository.bookAuthor(1);
@@ -54,7 +53,6 @@ contract BookRepositoryTest is Test {
 
         emit TransferSingle(alice, address(0), address(bookRepository), 2, 10);
         bookRepository.publish("fake_uri_alice", 2, 10);
-
         bookRepository.changeURI(2, "new_uri_alice");
 
         string memory aliceURI = bookRepository.uri(2);
