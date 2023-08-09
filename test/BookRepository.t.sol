@@ -25,7 +25,7 @@ contract BookRepositoryTest is Test {
     }
 
     function testPublish() public {
-        vm.prank(bob);
+        vm.startPrank(bob);
         vm.expectEmit();
 
         emit TransferSingle(bob, address(0), address(bookRepository), 1, 10);
@@ -39,6 +39,26 @@ contract BookRepositoryTest is Test {
 
         string memory uri = bookRepository.uri(1);
         assertEq("fake_uri", uri);
+
+        vm.stopPrank();
+        vm.startPrank(alice);
+
+        emit TransferSingle(alice, address(0), address(bookRepository), 2, 10);
+        bookRepository.publish("fake_uri_alice", 2, 10);
+
+        address authorAlice = bookRepository.bookAuthor(2);
+        assertEq(authorAlice, alice);
+
+        uint256 balanceAliceBook = bookRepository.balanceOf(
+            address(bookRepository),
+            2
+        );
+        assertEq(balanceAliceBook, 10);
+
+        string memory uriAlice = bookRepository.uri(2);
+        assertEq("fake_uri_alice", uriAlice);
+
+        vm.stopPrank();
     }
 
     function testChangeUri() public {
@@ -59,6 +79,8 @@ contract BookRepositoryTest is Test {
         assertEq("new_uri_alice", aliceURI);
 
         vm.expectRevert(abi.encodeWithSignature("NotAuthor()"));
+
+        //Should fail: Alice is trying to change the URI of Bob's book
         bookRepository.changeURI(1, "not_author");
 
         vm.stopPrank();
@@ -71,6 +93,7 @@ contract BookRepositoryTest is Test {
 
         vm.expectRevert(abi.encodeWithSignature("NotAuthor()"));
 
+        //Should fail: Bob is trying to change the URI of Alice's book
         bookRepository.changeURI(2, "not_author");
     }
 
