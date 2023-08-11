@@ -14,6 +14,9 @@ contract BookRepositoryTest is Test {
         uint256 value
     );
 
+    error NotAuthor();
+    error NotEnoughFunds(uint256 price);
+
     address owner = makeAddr("owner");
     address alice = makeAddr("alice");
     address bob = makeAddr("bob");
@@ -29,7 +32,7 @@ contract BookRepositoryTest is Test {
         vm.expectEmit();
 
         emit TransferSingle(bob, address(0), address(bookRepository), 1, 10);
-        bookRepository.publish("fake_uri", 1, 10);
+        bookRepository.publish("fake_uri", 1, 10, 1 wei);
 
         address author = bookRepository.bookAuthor(1);
         assertEq(author, bob);
@@ -44,7 +47,7 @@ contract BookRepositoryTest is Test {
         vm.startPrank(alice);
 
         emit TransferSingle(alice, address(0), address(bookRepository), 2, 10);
-        bookRepository.publish("fake_uri_alice", 2, 10);
+        bookRepository.publish("fake_uri_alice", 2, 10, 1 wei);
 
         address authorAlice = bookRepository.bookAuthor(2);
         assertEq(authorAlice, alice);
@@ -66,19 +69,19 @@ contract BookRepositoryTest is Test {
         vm.expectEmit();
 
         emit TransferSingle(bob, address(0), address(bookRepository), 1, 10);
-        bookRepository.publish("fake_uri", 1, 10);
+        bookRepository.publish("fake_uri", 1, 10, 1 wei);
 
         vm.startPrank(alice);
         vm.expectEmit();
 
         emit TransferSingle(alice, address(0), address(bookRepository), 2, 10);
-        bookRepository.publish("fake_uri_alice", 2, 10);
+        bookRepository.publish("fake_uri_alice", 2, 10, 1 wei);
         bookRepository.changeURI(2, "new_uri_alice");
 
         string memory aliceURI = bookRepository.uri(2);
         assertEq("new_uri_alice", aliceURI);
 
-        vm.expectRevert(abi.encodeWithSignature("NotAuthor()"));
+        vm.expectRevert(NotAuthor.selector);
 
         //Should fail: Alice is trying to change the URI of Bob's book
         bookRepository.changeURI(1, "not_author");
@@ -91,7 +94,7 @@ contract BookRepositoryTest is Test {
         string memory bobURI = bookRepository.uri(1);
         assertEq("new_uri_bob", bobURI);
 
-        vm.expectRevert(abi.encodeWithSignature("NotAuthor()"));
+        vm.expectRevert(NotAuthor.selector);
 
         //Should fail: Bob is trying to change the URI of Alice's book
         bookRepository.changeURI(2, "not_author");
@@ -99,11 +102,23 @@ contract BookRepositoryTest is Test {
 
     function testBuy() public {
         vm.startPrank(bob);
+        vm.deal(bob, 1 ether);
 
-        bookRepository.publish("fake_uri", 1, 10);
+        bookRepository.publish("fake_uri", 1, 10, 1 wei);
+
+        vm.expectRevert(abi.encodeWithSelector(NotEnoughFunds.selector, 1));
+
+        //Should fail because not enough funds were sent
         bookRepository.buyBook(1);
+
+        //Should succeed
+        bookRepository.buyBook{value: 1 wei}(1);
 
         uint256 balance = bookRepository.balanceOf(bob, 1);
         assertEq(balance, 1);
+
+        //Contract should have 1 wei balance
+        uint256 bookRepositoryBalance = address(bookRepository).balance;
+        assertEq(bookRepositoryBalance, 1 wei);
     }
 }
