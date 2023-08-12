@@ -29,23 +29,29 @@ contract BookRepositoryTest is Test {
 
     function testPublish() public {
         vm.startPrank(bob);
-        vm.expectEmit();
 
+        //Should mint 10 books by Bob
+        vm.expectEmit();
         emit TransferSingle(bob, address(0), address(bookRepository), 1, 10);
         bookRepository.publish("fake_uri", 1, 10, 1 wei);
 
-        address author = bookRepository.bookAuthor(1);
-        assertEq(author, bob);
+        address authorBob = bookRepository.bookAuthor(1);
+        assertEq(authorBob, bob);
 
-        uint256 balance = bookRepository.balanceOf(address(bookRepository), 1);
-        assertEq(balance, 10);
+        uint256 balanceBobBook = bookRepository.balanceOf(
+            address(bookRepository),
+            1
+        );
+        assertEq(balanceBobBook, 10);
 
-        string memory uri = bookRepository.uri(1);
-        assertEq("fake_uri", uri);
+        string memory uriBob = bookRepository.uri(1);
+        assertEq("fake_uri", uriBob);
 
         vm.stopPrank();
-        vm.startPrank(alice);
 
+        //Should mint 10 books by Alice
+        vm.startPrank(alice);
+        vm.expectEmit();
         emit TransferSingle(alice, address(0), address(bookRepository), 2, 10);
         bookRepository.publish("fake_uri_alice", 2, 10, 1 wei);
 
@@ -61,54 +67,67 @@ contract BookRepositoryTest is Test {
         string memory uriAlice = bookRepository.uri(2);
         assertEq("fake_uri_alice", uriAlice);
 
+        //Alice shouldn't be able to mint more of Bob's book
+        vm.expectRevert(NotAuthor.selector);
+        bookRepository.publish("fake_uri", 1, 10, 1 wei);
+
         vm.stopPrank();
+
+        //Bob should be able to mint more of his own book
+        vm.prank(bob);
+        bookRepository.publish("fake_uri", 1, 10, 1 wei);
+
+        uint256 updatedBalanceBobBook = bookRepository.balanceOf(
+            address(bookRepository),
+            1
+        );
+        assertEq(updatedBalanceBobBook, 20);
     }
 
     function testChangeUri() public {
-        vm.prank(bob);
-        vm.expectEmit();
+        vm.startPrank(bob);
 
+        //Should publish Bob's book with correct URI
+        vm.expectEmit();
         emit TransferSingle(bob, address(0), address(bookRepository), 1, 10);
         bookRepository.publish("fake_uri", 1, 10, 1 wei);
 
-        vm.startPrank(alice);
-        vm.expectEmit();
-
-        emit TransferSingle(alice, address(0), address(bookRepository), 2, 10);
-        bookRepository.publish("fake_uri_alice", 2, 10, 1 wei);
-        bookRepository.changeURI(2, "new_uri_alice");
-
-        string memory aliceURI = bookRepository.uri(2);
-        assertEq("new_uri_alice", aliceURI);
-
-        vm.expectRevert(NotAuthor.selector);
-
-        //Should fail: Alice is trying to change the URI of Bob's book
-        bookRepository.changeURI(1, "not_author");
-
-        vm.stopPrank();
-        vm.prank(bob);
-
+        //Bob should be able to update his book URI
         bookRepository.changeURI(1, "new_uri_bob");
 
         string memory bobURI = bookRepository.uri(1);
         assertEq("new_uri_bob", bobURI);
 
-        vm.expectRevert(NotAuthor.selector);
+        vm.stopPrank();
+        vm.startPrank(alice);
 
-        //Should fail: Bob is trying to change the URI of Alice's book
-        bookRepository.changeURI(2, "not_author");
+        //Should publish Alice's book with correct URI
+        vm.expectEmit();
+        emit TransferSingle(alice, address(0), address(bookRepository), 2, 10);
+        bookRepository.publish("fake_uri_alice", 2, 10, 1 wei);
+
+        //Alice should be able to change her book URI
+        bookRepository.changeURI(2, "new_uri_alice");
+
+        string memory aliceURI = bookRepository.uri(2);
+        assertEq("new_uri_alice", aliceURI);
+
+        //Alice shouldn't be able to change the URI of Bob's book
+        vm.expectRevert(NotAuthor.selector);
+        bookRepository.changeURI(1, "not_author");
+
+        vm.stopPrank();
     }
 
     function testBuy() public {
         vm.startPrank(bob);
         vm.deal(bob, 1 ether);
 
+        //Should publish Bob's book with the price of 1 wei
         bookRepository.publish("fake_uri", 1, 10, 1 wei);
 
-        vm.expectRevert(abi.encodeWithSelector(NotEnoughFunds.selector, 1));
-
         //Should fail because not enough funds were sent
+        vm.expectRevert(abi.encodeWithSelector(NotEnoughFunds.selector, 1));
         bookRepository.buyBook(1);
 
         //Should succeed
@@ -120,5 +139,7 @@ contract BookRepositoryTest is Test {
         //Contract should have 1 wei balance
         uint256 bookRepositoryBalance = address(bookRepository).balance;
         assertEq(bookRepositoryBalance, 1 wei);
+
+        vm.stopPrank();
     }
 }

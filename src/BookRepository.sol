@@ -26,6 +26,7 @@ contract BookRepository is Ownable, ERC1155URIStorage, ERC1155Holder {
     }
 
     function changeURI(uint256 id, string memory uri) external {
+        //msg.sender must be the author
         if (bookAuthor[id] != msg.sender) {
             revert NotAuthor();
         }
@@ -39,6 +40,7 @@ contract BookRepository is Ownable, ERC1155URIStorage, ERC1155Holder {
         uint256 amount,
         uint256 price
     ) external {
+        //msg.sender must be the author if the id is in use already
         if (bookAuthor[id] != msg.sender && bookAuthor[id] != address(0)) {
             revert NotAuthor();
         }
