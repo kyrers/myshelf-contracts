@@ -17,39 +17,41 @@ contract BookRepository is Ownable, ERC1155URIStorage, ERC1155Holder {
 
     constructor() ERC1155("") Ownable(msg.sender) {}
 
-    function buyBook(uint256 id) external payable {
-        if (msg.value < bookPrice[id]) {
-            revert NotEnoughFunds(bookPrice[id]);
+    function buyBook(uint256 bookId) external payable {
+        if (msg.value < bookPrice[bookId]) {
+            revert NotEnoughFunds(bookPrice[bookId]);
         }
 
-        _safeTransferFrom(address(this), msg.sender, id, 1, "");
+        _safeTransferFrom(address(this), msg.sender, bookId, 1, "");
     }
 
-    function changeURI(uint256 id, string memory uri) external {
+    function changeURI(uint256 bookId, string memory uri) external {
         //msg.sender must be the author
-        if (bookAuthor[id] != msg.sender) {
+        if (bookAuthor[bookId] != msg.sender) {
             revert NotAuthor();
         }
 
-        _setURI(id, uri);
+        _setURI(bookId, uri);
     }
 
     function publish(
         string memory uri,
-        uint256 id,
+        uint256 bookId,
         uint256 amount,
         uint256 price
     ) external {
-        //msg.sender must be the author if the id is in use already
-        if (bookAuthor[id] != msg.sender && bookAuthor[id] != address(0)) {
+        //msg.sender must be the author if the id is already in use
+        if (
+            bookAuthor[bookId] != msg.sender && bookAuthor[bookId] != address(0)
+        ) {
             revert NotAuthor();
         }
 
-        bookAuthor[id] = msg.sender;
-        bookPrice[id] = price;
+        bookAuthor[bookId] = msg.sender;
+        bookPrice[bookId] = price;
 
-        _mint(address(this), id, amount, "");
-        _setURI(id, uri);
+        _mint(address(this), bookId, amount, "");
+        _setURI(bookId, uri);
     }
 
     function supportsInterface(
