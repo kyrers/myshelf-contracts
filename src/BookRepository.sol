@@ -14,10 +14,15 @@ contract BookRepository is Ownable, ERC1155URIStorage, ERC1155Holder {
 
     error NotAuthor();
     error NotEnoughFunds(uint256 price);
+    error UnpublishedBook();
 
     constructor() ERC1155("") Ownable(msg.sender) {}
 
     function buyBook(uint256 bookId) external payable {
+        if (bookAuthor[bookId] != address(0)) {
+            revert UnpublishedBook();
+        }
+
         if (msg.value < bookPrice[bookId]) {
             revert NotEnoughFunds(bookPrice[bookId]);
         }
