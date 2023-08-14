@@ -16,13 +16,16 @@ contract BookRepository is Ownable, ERC1155URIStorage, ERC1155Holder {
     error NotEnoughFunds(uint256 price);
     error UnpublishedBook();
 
-    constructor() ERC1155("") Ownable(msg.sender) {}
-
-    function buyBook(uint256 bookId) external payable {
+    modifier isPublished(uint256 bookId) {
         if (bookAuthor[bookId] == address(0)) {
             revert UnpublishedBook();
         }
+        _;
+    }
 
+    constructor() ERC1155("") Ownable(msg.sender) {}
+
+    function buyBook(uint256 bookId) external payable isPublished(bookId) {
         if (msg.value < bookPrice[bookId]) {
             revert NotEnoughFunds(bookPrice[bookId]);
         }
@@ -30,7 +33,7 @@ contract BookRepository is Ownable, ERC1155URIStorage, ERC1155Holder {
         _safeTransferFrom(address(this), msg.sender, bookId, 1, "");
     }
 
-    function changeURI(uint256 bookId, string memory uri) external {
+    function changeURI(uint256 bookId, string memory uri) external isPublished(bookId) {
         //msg.sender must be the author
         if (bookAuthor[bookId] != msg.sender) {
             revert NotAuthor();
