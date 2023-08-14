@@ -19,7 +19,7 @@ contract BookRepository is Ownable, ERC1155URIStorage, ERC1155Holder {
     constructor() ERC1155("") Ownable(msg.sender) {}
 
     function buyBook(uint256 bookId) external payable {
-        if (bookAuthor[bookId] != address(0)) {
+        if (bookAuthor[bookId] == address(0)) {
             revert UnpublishedBook();
         }
 
