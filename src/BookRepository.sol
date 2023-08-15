@@ -2,10 +2,16 @@
 pragma solidity ^0.8.21;
 
 import {Ownable} from "@openzeppelin/access/Ownable.sol";
+import {ReentrancyGuard} from "@openzeppelin/security/ReentrancyGuard.sol";
 import {ERC1155, ERC1155URIStorage} from "@openzeppelin/token/ERC1155/extensions/ERC1155URIStorage.sol";
 import {ERC1155Holder} from "@openzeppelin/token/ERC1155/utils/ERC1155Holder.sol";
 
-contract BookRepository is Ownable, ERC1155URIStorage, ERC1155Holder {
+contract BookRepository is
+    Ownable,
+    ERC1155URIStorage,
+    ERC1155Holder,
+    ReentrancyGuard
+{
     //Mapping of book ID to author
     mapping(uint256 => address) public bookAuthor;
 
@@ -25,7 +31,9 @@ contract BookRepository is Ownable, ERC1155URIStorage, ERC1155Holder {
 
     constructor() ERC1155("") Ownable(msg.sender) {}
 
-    function buyBook(uint256 bookId) external payable isPublished(bookId) {
+    function buyBook(
+        uint256 bookId
+    ) external payable isPublished(bookId) nonReentrant {
         if (msg.value < bookPrice[bookId]) {
             revert NotEnoughFunds(bookPrice[bookId]);
         }
@@ -33,7 +41,10 @@ contract BookRepository is Ownable, ERC1155URIStorage, ERC1155Holder {
         _safeTransferFrom(address(this), msg.sender, bookId, 1, "");
     }
 
-    function changeURI(uint256 bookId, string memory uri) external isPublished(bookId) {
+    function changeURI(
+        uint256 bookId,
+        string memory uri
+    ) external isPublished(bookId) {
         //msg.sender must be the author
         if (bookAuthor[bookId] != msg.sender) {
             revert NotAuthor();
@@ -47,7 +58,7 @@ contract BookRepository is Ownable, ERC1155URIStorage, ERC1155Holder {
         uint256 bookId,
         uint256 amount,
         uint256 price
-    ) external {
+    ) external nonReentrant {
         //msg.sender must be the author if the id is already in use
         if (
             bookAuthor[bookId] != msg.sender && bookAuthor[bookId] != address(0)
