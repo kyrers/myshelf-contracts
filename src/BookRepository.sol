@@ -6,16 +6,18 @@ import {ReentrancyGuard} from "@openzeppelin/security/ReentrancyGuard.sol";
 import {ERC1155, ERC1155URIStorage} from "@openzeppelin/token/ERC1155/extensions/ERC1155URIStorage.sol";
 import {ERC1155Holder} from "@openzeppelin/token/ERC1155/utils/ERC1155Holder.sol";
 
+/**
+ * @title Book Repository
+ * @author kyrers
+ * @notice ERC1155 that publishes, holds, and sells books.
+ */
 contract BookRepository is
     Ownable,
     ERC1155URIStorage,
     ERC1155Holder,
     ReentrancyGuard
 {
-    //Mapping of book ID to author
     mapping(uint256 => address) public bookAuthor;
-
-    //Mapping of book ID to price (in wei)
     mapping(uint256 => uint256) public bookPrice;
 
     error NotAuthor();
@@ -31,6 +33,10 @@ contract BookRepository is
 
     constructor() ERC1155("") Ownable(msg.sender) {}
 
+    /**
+     * @notice Tansfers one book of type `id` to `msg.sender` if enough funds are sent
+     * @param bookId type `id` of the wanted book
+     */
     function buyBook(
         uint256 bookId
     ) external payable isPublished(bookId) nonReentrant {
@@ -41,11 +47,15 @@ contract BookRepository is
         _safeTransferFrom(address(this), msg.sender, bookId, 1, "");
     }
 
+    /**
+     * @notice Allows the `author` of a published book with type `bookId` to update its `uri`
+     * @param bookId type `id` of the book
+     * @param uri the new `uri`
+     */
     function changeURI(
         uint256 bookId,
         string memory uri
     ) external isPublished(bookId) {
-        //msg.sender must be the author
         if (bookAuthor[bookId] != msg.sender) {
             revert NotAuthor();
         }
@@ -53,13 +63,20 @@ contract BookRepository is
         _setURI(bookId, uri);
     }
 
+    /**
+     * @notice Publishes `amount` new books of type `bookId`, costing `price` and with `uri`
+     * @param bookId type `id` of the book
+     * @param amount number of books to publish
+     * @param price the cost of each book in wei
+     * @param uri the type `uri`
+     * @dev Only executes if the type is not published, or if it is, this is the author minting more instances
+     */
     function publish(
-        string memory uri,
         uint256 bookId,
         uint256 amount,
-        uint256 price
+        uint256 price,
+        string memory uri
     ) external nonReentrant {
-        //msg.sender must be the author if the id is already in use
         if (
             bookAuthor[bookId] != msg.sender && bookAuthor[bookId] != address(0)
         ) {
@@ -73,6 +90,10 @@ contract BookRepository is
         _setURI(bookId, uri);
     }
 
+    /**
+     * @notice Since both ERC1155 and ERC1155Holder implement this, check if `interfaceId` matches `ERC1155` first or `ERC1155Holder` second.
+     * @param interfaceId The interface to check
+     */
     function supportsInterface(
         bytes4 interfaceId
     ) public view virtual override(ERC1155, ERC1155Holder) returns (bool) {
