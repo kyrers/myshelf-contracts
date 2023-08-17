@@ -18,9 +18,9 @@ contract BookRepositoryTest is Test {
     error NotEnoughFunds(uint256 price);
     error UnpublishedBook();
 
-    address owner = makeAddr("owner");
     address alice = makeAddr("alice");
     address bob = makeAddr("bob");
+    address charlie = makeAddr("charlie");
 
     BookRepository bookRepository;
 
@@ -28,25 +28,34 @@ contract BookRepositoryTest is Test {
         bookRepository = new BookRepository();
     }
 
-    /// @notice tests that alice can buy bob's book
+    /// @notice tests that alice can buy bob and charlie books
     function test_buy() public {
         vm.prank(bob);
 
         //Should publish Bob's book with the price of 1 wei
         bookRepository.publish(1, 10, 1 wei, "fake_uri");
 
-        vm.prank(alice);
+        vm.prank(charlie);
+
+        //Should publish Charile's book with the price of 1 wei
+        bookRepository.publish(2, 10, 2 wei, "fake_uri_charlie");
+
+        vm.startPrank(alice);
         vm.deal(alice, 1 ether);
 
         //Should succeed
         bookRepository.buyBook{value: 1 wei}(1);
+        bookRepository.buyBook{value: 2 wei}(2);
 
-        uint256 balance = bookRepository.balanceOf(alice, 1);
-        assertEq(balance, 1);
+        uint256 balanceBobBook = bookRepository.balanceOf(alice, 1);
+        assertEq(balanceBobBook, 1);
 
-        //Contract should have 1 wei balance
+        uint256 balanceCharlieBook = bookRepository.balanceOf(alice, 2);
+        assertEq(balanceCharlieBook, 1);
+
+        //Contract should have 3 wei balance
         uint256 bookRepositoryBalance = address(bookRepository).balance;
-        assertEq(bookRepositoryBalance, 1 wei);
+        assertEq(bookRepositoryBalance, 3 wei);
     }
 
     /// @notice tests that purchases fail if not enough funds are sent
@@ -186,8 +195,8 @@ contract BookRepositoryTest is Test {
         //Bob should be able to update his book URI
         bookRepository.changeURI(1, "new_uri_bob");
 
-        string memory bobURI = bookRepository.uri(1);
-        assertEq("new_uri_bob", bobURI);
+        string memory newURI = bookRepository.uri(1);
+        assertEq("new_uri_bob", newURI);
 
         vm.stopPrank();
     }
