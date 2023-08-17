@@ -20,13 +20,28 @@ contract BookRepository is
     mapping(uint256 => address) public bookAuthor;
     mapping(uint256 => uint256) public bookPrice;
 
+    error InvalidPrice();
     error NotAuthor();
     error NotEnoughFunds(uint256 price);
     error UnpublishedBook();
 
+    modifier isAuthor(uint256 bookId) {
+        if (msg.sender != bookAuthor[bookId]) {
+            revert NotAuthor();
+        }
+        _;
+    }
+
     modifier isPublished(uint256 bookId) {
-        if (bookAuthor[bookId] == address(0)) {
+        if (address(0) == bookAuthor[bookId]) {
             revert UnpublishedBook();
+        }
+        _;
+    }
+
+    modifier isValidPrice(uint256 price) {
+        if (0 >= price) {
+            revert InvalidPrice();
         }
         _;
     }
@@ -48,6 +63,18 @@ contract BookRepository is
     }
 
     /**
+     * @notice Allows the `author` of a published book with type `bookId` to update its `price`
+     * @param bookId type `id` of the wanted book
+     * @param price the new price
+     */
+    function changePrice(
+        uint256 bookId,
+        uint256 price
+    ) external isPublished(bookId) isAuthor(bookId) isValidPrice(price) {
+        bookPrice[bookId] = price;
+    }
+
+    /**
      * @notice Allows the `author` of a published book with type `bookId` to update its `uri`
      * @param bookId type `id` of the book
      * @param uri the new `uri`
@@ -55,11 +82,7 @@ contract BookRepository is
     function changeURI(
         uint256 bookId,
         string memory uri
-    ) external isPublished(bookId) {
-        if (bookAuthor[bookId] != msg.sender) {
-            revert NotAuthor();
-        }
-
+    ) external isPublished(bookId) isAuthor(bookId) {
         _setURI(bookId, uri);
     }
 
@@ -76,7 +99,7 @@ contract BookRepository is
         uint256 amount,
         uint256 price,
         string memory uri
-    ) external nonReentrant {
+    ) external isValidPrice(price) nonReentrant {
         if (
             bookAuthor[bookId] != msg.sender && bookAuthor[bookId] != address(0)
         ) {
