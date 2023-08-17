@@ -14,6 +14,7 @@ contract BookRepositoryTest is Test {
         uint256 value
     );
 
+    error InvalidPrice();
     error NotAuthor();
     error NotEnoughFunds(uint256 price);
     error UnpublishedBook();
@@ -104,6 +105,104 @@ contract BookRepositoryTest is Test {
         vm.stopPrank();
     }
 
+    /// @notice test that authors can update their book `price`
+    function test_changePrice() public {
+        vm.startPrank(bob);
+
+        //Should publish Bob's book with correct price
+        vm.expectEmit();
+        emit TransferSingle(bob, address(0), address(bookRepository), 1, 10);
+        bookRepository.publish(1, 10, 1 wei, "fake_uri");
+
+        //Bob should be able to update his book price
+        bookRepository.changePrice(1, 2 wei);
+
+        uint256 newPrice = bookRepository.bookPrice(1);
+        assertEq(newPrice, 2 wei);
+
+        vm.stopPrank();
+    }
+
+    /// @notice test that users can't update the `price` of books they're are not the author of
+    function test_changePrice_revertNotAuthor() public {
+        vm.prank(bob);
+        bookRepository.publish(1, 10, 1 wei, "fake_uri");
+
+        //Alice shouldn't be able to change the price of Bob's book
+        vm.prank(alice);
+        vm.expectRevert(NotAuthor.selector);
+        bookRepository.changePrice(1, 2 wei);
+    }
+
+    /// @notice test that unpublished books can't have their `price` updated
+    function test_changePrice_revertUnpublishedBook() public {
+        vm.expectRevert(UnpublishedBook.selector);
+        bookRepository.changePrice(1, 2 wei);
+    }
+
+    /// @notice test that invalid prices are not accepted
+    function test_changePrice_revertInvalidPrice() public {
+        vm.startPrank(bob);
+
+        bookRepository.publish(1, 10, 1 wei, "fake_uri");
+        vm.expectRevert(InvalidPrice.selector);
+        bookRepository.changePrice(1, 0 wei);
+
+        vm.stopPrank();
+    }
+
+    /// @notice fuzz test the changePrice function with different `price` values
+    function testFuzz_changePrice(uint256 price) public {
+        vm.startPrank(bob);
+
+        //Publish the book with 1 wei price
+        bookRepository.publish(1, 10, 1 wei, "fake_uri");
+
+        //Expect revert if price is invalid
+        if (price <= 0) {
+            vm.expectRevert(InvalidPrice.selector);
+        }
+
+        bookRepository.changePrice(1, price);
+
+        vm.stopPrank();
+    }
+
+    /// @notice test that authors can update their book `uri`
+    function test_changeUri() public {
+        vm.startPrank(bob);
+
+        //Should publish Bob's book with correct URI
+        vm.expectEmit();
+        emit TransferSingle(bob, address(0), address(bookRepository), 1, 10);
+        bookRepository.publish(1, 10, 1 wei, "fake_uri");
+
+        //Bob should be able to update his book URI
+        bookRepository.changeURI(1, "new_uri_bob");
+
+        string memory newURI = bookRepository.uri(1);
+        assertEq("new_uri_bob", newURI);
+
+        vm.stopPrank();
+    }
+
+    /// @notice test that users can't update the `uri` of books they're are not the author of
+    function test_changeUri_revertNotAuthor() public {
+        vm.prank(bob);
+        bookRepository.publish(1, 10, 1 wei, "fake_uri");
+
+        //Alice shouldn't be able to change the URI of Bob's book
+        vm.prank(alice);
+        vm.expectRevert(NotAuthor.selector);
+        bookRepository.changeURI(1, "not_author");
+    }
+
+    /// @notice test that unpublished books can't have their `uri` updated
+    function test_changeUri_revertUnpublishedBook() public {
+        vm.expectRevert(UnpublishedBook.selector);
+        bookRepository.changeURI(2, "unpublished book");
+    }
+
     /// @notice test that multiple users can publish books and that they can mint more if they're the author
     function test_publish() public {
         vm.startPrank(bob);
@@ -121,6 +220,9 @@ contract BookRepositoryTest is Test {
             1
         );
         assertEq(balanceBobBook, 10);
+
+        uint256 priceBob = bookRepository.bookPrice(1);
+        assertEq(priceBob, 1 wei);
 
         string memory uriBob = bookRepository.uri(1);
         assertEq("fake_uri", uriBob);
@@ -141,6 +243,9 @@ contract BookRepositoryTest is Test {
             2
         );
         assertEq(balanceAliceBook, 10);
+
+        uint256 priceAlice = bookRepository.bookPrice(2);
+        assertEq(priceAlice, 1 wei);
 
         string memory uriAlice = bookRepository.uri(2);
         assertEq("fake_uri_alice", uriAlice);
@@ -170,51 +275,33 @@ contract BookRepositoryTest is Test {
         bookRepository.publish(1, 10, 1 wei, "fake_uri");
     }
 
-    /// @notice fuzz test the publish function with different but valid `bookId`, `amount`, and `price` values
+    /// @notice fuzz test the publish function with different `bookId`, `amount`, and `price` values
     function testFuzz_publish(
         uint256 bookId,
         uint256 amount,
         uint256 price
     ) public {
-        vm.assume(bookId > 0);
-        vm.assume(amount >= 0);
-        vm.assume(price > 0 ether);
-
-        bookRepository.publish(bookId, amount, price, "fake_uri");
-    }
-
-    /// @notice test that authors can update their book `uri`
-    function test_uri_change() public {
-        vm.startPrank(bob);
-
-        //Should publish Bob's book with correct URI
-        vm.expectEmit();
-        emit TransferSingle(bob, address(0), address(bookRepository), 1, 10);
-        bookRepository.publish(1, 10, 1 wei, "fake_uri");
-
-        //Bob should be able to update his book URI
-        bookRepository.changeURI(1, "new_uri_bob");
-
-        string memory newURI = bookRepository.uri(1);
-        assertEq("new_uri_bob", newURI);
-
-        vm.stopPrank();
-    }
-
-    /// @notice test that users can't update the `uri` of books they're are not the author of
-    function test_uri_revertNotAuthor() public {
         vm.prank(bob);
-        bookRepository.publish(1, 10, 1 wei, "fake_uri");
 
-        //Alice shouldn't be able to change the URI of Bob's book
-        vm.prank(alice);
-        vm.expectRevert(NotAuthor.selector);
-        bookRepository.changeURI(1, "not_author");
-    }
+        if (0 wei >= price) {
+            vm.expectRevert(InvalidPrice.selector);
+            bookRepository.publish(bookId, amount, price, "fake_uri");
+        } else {
+            vm.expectEmit();
+            emit TransferSingle(
+                bob,
+                address(0),
+                address(bookRepository),
+                bookId,
+                amount
+            );
+            bookRepository.publish(bookId, amount, price, "fake_uri");
 
-    /// @notice test that unpublished books can't have their uri updated
-    function test_uri_revertUnpublishedBook() public {
-        vm.expectRevert(UnpublishedBook.selector);
-        bookRepository.changeURI(2, "unpublished book");
+            uint256 priceBob = bookRepository.bookPrice(bookId);
+            assertEq(priceBob, price);
+
+            string memory uriBob = bookRepository.uri(bookId);
+            assertEq("fake_uri", uriBob);
+        }
     }
 }
