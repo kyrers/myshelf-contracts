@@ -17,6 +17,7 @@ contract BookRepository is
     ERC1155Holder,
     ReentrancyGuard
 {
+    uint256 private _bookCount;
     mapping(uint256 => address) public bookAuthor;
     mapping(uint256 => uint256) public bookPrice;
 
@@ -49,6 +50,27 @@ contract BookRepository is
     constructor() ERC1155("") Ownable(msg.sender) {}
 
     /**
+     * @notice Publishes `amount` new books, costing `price` and with `uri`
+     * @param amount number of books to publish
+     * @param price the cost of each book in wei
+     * @param uri the type `uri`
+     * @return bookId is the published book type `id`
+     */
+    function publish(
+        uint256 amount,
+        uint256 price,
+        string memory uri
+    ) external isValidPrice(price) nonReentrant returns (uint256 bookId) {
+        bookId = ++_bookCount;
+
+        bookAuthor[bookId] = msg.sender;
+        bookPrice[bookId] = price;
+
+        _mint(address(this), bookId, amount, "");
+        _setURI(bookId, uri);
+    }
+
+    /**
      * @notice Tansfers one book of type `id` to `msg.sender` if enough funds are sent
      * @param bookId type `id` of the wanted book
      */
@@ -60,6 +82,33 @@ contract BookRepository is
         }
 
         _safeTransferFrom(address(this), msg.sender, bookId, 1, "");
+    }
+
+    /**
+     * @notice Increase supply of books of type `bookId` by `amount`, costing `price` and with `uri`
+     * @param bookId type `id` of the book
+     * @param amount number of books to publish
+     * @param price the cost of each book in wei
+     * @param uri the type `uri`
+     * @dev Only executes if the type is not published, or if it is, this is the author minting more instances
+     */
+    function increaseSupply(
+        uint256 bookId,
+        uint256 amount,
+        uint256 price,
+        string memory uri
+    )
+        external
+        isPublished(bookId)
+        isAuthor(bookId)
+        isValidPrice(price)
+        nonReentrant
+    {
+        bookAuthor[bookId] = msg.sender;
+        bookPrice[bookId] = price;
+
+        _mint(address(this), bookId, amount, "");
+        _setURI(bookId, uri);
     }
 
     /**
@@ -83,33 +132,6 @@ contract BookRepository is
         uint256 bookId,
         string memory uri
     ) external isPublished(bookId) isAuthor(bookId) {
-        _setURI(bookId, uri);
-    }
-
-    /**
-     * @notice Publishes `amount` new books of type `bookId`, costing `price` and with `uri`
-     * @param bookId type `id` of the book
-     * @param amount number of books to publish
-     * @param price the cost of each book in wei
-     * @param uri the type `uri`
-     * @dev Only executes if the type is not published, or if it is, this is the author minting more instances
-     */
-    function publish(
-        uint256 bookId,
-        uint256 amount,
-        uint256 price,
-        string memory uri
-    ) external isValidPrice(price) nonReentrant {
-        if (
-            bookAuthor[bookId] != msg.sender && bookAuthor[bookId] != address(0)
-        ) {
-            revert NotAuthor();
-        }
-
-        bookAuthor[bookId] = msg.sender;
-        bookPrice[bookId] = price;
-
-        _mint(address(this), bookId, amount, "");
         _setURI(bookId, uri);
     }
 
