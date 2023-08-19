@@ -21,6 +21,7 @@ contract BookRepository is
     mapping(uint256 => address) public bookAuthor;
     mapping(uint256 => uint256) public bookPrice;
 
+    error InvalidAmount();
     error InvalidPrice();
     error NotAuthor();
     error NotEnoughFunds(uint256 price);
@@ -36,6 +37,13 @@ contract BookRepository is
     modifier isPublished(uint256 bookId) {
         if (address(0) == bookAuthor[bookId]) {
             revert UnpublishedBook();
+        }
+        _;
+    }
+
+    modifier isValidAmount(uint256 bookId, uint256 amount) {
+        if (amount > type(uint256).max - balanceOf(address(this), bookId)) {
+            revert InvalidAmount();
         }
         _;
     }
@@ -90,7 +98,7 @@ contract BookRepository is
      * @param amount number of books to publish
      * @param price the cost of each book in wei
      * @param uri the type `uri`
-     * @dev Only executes if the type is not published, or if it is, this is the author minting more instances
+     * @dev Only executes if the all of the following is true: type is published, msg.sender is the author, the increase amount does not surpass type(uint256).max when added to the already existing amount of books, the price is valid
      */
     function increaseSupply(
         uint256 bookId,
@@ -101,6 +109,7 @@ contract BookRepository is
         external
         isPublished(bookId)
         isAuthor(bookId)
+        isValidAmount(bookId, amount)
         isValidPrice(price)
         nonReentrant
     {
