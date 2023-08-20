@@ -15,9 +15,9 @@ contract BookRepositoryTest is Test {
     );
 
     error InvalidAmount();
+    error InvalidPayment(uint256 price);
     error InvalidPrice();
     error NotAuthor();
-    error NotEnoughFunds(uint256 price);
     error UnpublishedBook();
 
     address alice = makeAddr("alice");
@@ -155,14 +155,14 @@ contract BookRepositoryTest is Test {
     }
 
     /// @notice tests that purchases fail if not enough funds are sent
-    function test_buy_revertNotEnoughFunds() public {
+    function test_buy_revertInvalidPayment() public {
         vm.startPrank(bob);
         vm.deal(bob, 1 ether);
 
         uint256 bookId = bookRepository.publish(10, 2 wei, "fake_uri");
 
         //Should fail because not enough funds were sent
-        vm.expectRevert(abi.encodeWithSelector(NotEnoughFunds.selector, 2));
+        vm.expectRevert(abi.encodeWithSelector(InvalidPayment.selector, 2));
         bookRepository.buyBook{value: 1 wei}(bookId);
 
         vm.stopPrank();
@@ -191,8 +191,8 @@ contract BookRepositoryTest is Test {
         if (bookId != 1) {
             vm.expectRevert(UnpublishedBook.selector);
             bookRepository.buyBook{value: value}(bookId);
-        } else if (value < 2 wei) {
-            vm.expectRevert(abi.encodeWithSelector(NotEnoughFunds.selector, 2));
+        } else if (value != 2 wei) {
+            vm.expectRevert(abi.encodeWithSelector(InvalidPayment.selector, 2));
             bookRepository.buyBook{value: value}(bookId);
         }
 
