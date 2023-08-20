@@ -22,9 +22,9 @@ contract BookRepository is
     mapping(uint256 => uint256) public bookPrice;
 
     error InvalidAmount();
+    error InvalidPayment(uint256 price);
     error InvalidPrice();
     error NotAuthor();
-    error NotEnoughFunds(uint256 price);
     error UnpublishedBook();
 
     modifier isAuthor(uint256 bookId) {
@@ -79,14 +79,14 @@ contract BookRepository is
     }
 
     /**
-     * @notice Tansfers one book of type `id` to `msg.sender` if enough funds are sent
+     * @notice Tansfers one book of type `id` to `msg.sender` if `msg.value` equals the book price
      * @param bookId type `id` of the wanted book
      */
     function buyBook(
         uint256 bookId
     ) external payable isPublished(bookId) nonReentrant {
-        if (msg.value < bookPrice[bookId]) {
-            revert NotEnoughFunds(bookPrice[bookId]);
+        if (msg.value != bookPrice[bookId]) {
+            revert InvalidPayment(bookPrice[bookId]);
         }
 
         _safeTransferFrom(address(this), msg.sender, bookId, 1, "");
