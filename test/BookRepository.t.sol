@@ -14,6 +14,12 @@ contract BookRepositoryTest is Test {
         uint256 value
     );
 
+    event BookBought(address buyer, uint256 bookId, uint256 price);
+    event BookPublished(address author, uint256 bookId, uint256 price);
+    event PriceUpdated(uint256 bookId, uint256 newPrice);
+    event SupplyIncreased(uint256 bookId, uint256 amount, uint256 totalSupply);
+    event URIUpdated(uint256 bookId, string newURI);
+
     error InvalidAmount();
     error InvalidPayment(uint256 price);
     error InvalidPrice();
@@ -34,8 +40,12 @@ contract BookRepositoryTest is Test {
     function test_publish() public {
         //Should mint 10 books by Bob
         vm.startPrank(bob);
+
         vm.expectEmit();
         emit TransferSingle(bob, address(0), address(bookRepository), 1, 10);
+
+        vm.expectEmit();
+        emit BookPublished(bob, 1, 1 wei);
 
         uint256 bobBookId = bookRepository.publish(10, 1 wei, "fake_uri");
         assertEq(bobBookId, 1);
@@ -59,8 +69,12 @@ contract BookRepositoryTest is Test {
 
         //Should mint 10 books by Alice
         vm.startPrank(alice);
+
         vm.expectEmit();
         emit TransferSingle(alice, address(0), address(bookRepository), 2, 10);
+
+        vm.expectEmit();
+        emit BookPublished(alice, 2, 1 wei);
 
         uint256 aliceBookId = bookRepository.publish(
             10,
@@ -110,6 +124,10 @@ contract BookRepositoryTest is Test {
                 1,
                 amount
             );
+
+            vm.expectEmit();
+            emit BookPublished(bob, 1, price);
+
             uint256 bookId = bookRepository.publish(amount, price, "fake_uri");
 
             uint256 priceBob = bookRepository.bookPrice(bookId);
@@ -130,7 +148,7 @@ contract BookRepositoryTest is Test {
         vm.prank(charlie);
 
         //Should publish Charile's book with the price of 1 wei
-        uint256 aliceBookId = bookRepository.publish(
+        uint256 charlieBookId = bookRepository.publish(
             10,
             2 wei,
             "fake_uri_charlie"
@@ -140,8 +158,13 @@ contract BookRepositoryTest is Test {
         vm.deal(alice, 1 ether);
 
         //Should succeed
+        vm.expectEmit();
+        emit BookBought(alice, bobBookId, 1 wei);
         bookRepository.buyBook{value: 1 wei}(bobBookId);
-        bookRepository.buyBook{value: 2 wei}(aliceBookId);
+
+        vm.expectEmit();
+        emit BookBought(alice, charlieBookId, 2 wei);
+        bookRepository.buyBook{value: 2 wei}(charlieBookId);
 
         uint256 balanceBobBook = bookRepository.balanceOf(alice, 1);
         assertEq(balanceBobBook, 1);
@@ -194,6 +217,10 @@ contract BookRepositoryTest is Test {
         } else if (value != 2 wei) {
             vm.expectRevert(abi.encodeWithSelector(InvalidPayment.selector, 2));
             bookRepository.buyBook{value: value}(bookId);
+        } else {
+            vm.expectEmit();
+            emit BookBought(bob, 1, 2 wei);
+            bookRepository.buyBook{value: value}(bookId);
         }
 
         vm.stopPrank();
@@ -203,12 +230,16 @@ contract BookRepositoryTest is Test {
     function test_increaseSupply() public {
         //Should mint 10 books by Bob
         vm.startPrank(bob);
+
         vm.expectEmit();
         emit TransferSingle(bob, address(0), address(bookRepository), 1, 10);
 
         uint256 bookId = bookRepository.publish(10, 1 wei, "fake_uri");
 
         //Should increase supply to 20 and update price and uri accordingly
+        vm.expectEmit();
+        emit SupplyIncreased(bookId, 10, 20);
+
         bookRepository.increaseSupply(bookId, 10, 2 wei, "new_uri");
 
         uint256 balanceBook = bookRepository.balanceOf(
@@ -277,12 +308,12 @@ contract BookRepositoryTest is Test {
         if (bookId != bobBookId) {
             vm.expectRevert(UnpublishedBook.selector);
             bookRepository.increaseSupply(bookId, amount, price, "fake_uri");
-        } else if (0 wei >= price) {
-            vm.expectRevert(InvalidPrice.selector);
-            bookRepository.increaseSupply(bookId, amount, price, "fake_uri");
         } else if (amount > UINT256_MAX - 10) {
             //Checks that if the amount is increased by a value that when added to the already existing books is bigger than type(uint256).max the contract will overflow
             vm.expectRevert(InvalidAmount.selector);
+            bookRepository.increaseSupply(bookId, amount, price, "fake_uri");
+        } else if (0 wei >= price) {
+            vm.expectRevert(InvalidPrice.selector);
             bookRepository.increaseSupply(bookId, amount, price, "fake_uri");
         } else {
             vm.expectEmit();
@@ -293,6 +324,14 @@ contract BookRepositoryTest is Test {
                 bookId,
                 amount
             );
+
+            vm.expectEmit();
+            emit SupplyIncreased(
+                bookId,
+                amount,
+                amount + bookRepository.balanceOf(address(bookRepository), bookId)
+            );
+
             bookRepository.increaseSupply(bookId, amount, price, "fake_uri");
 
             uint256 amountBob = bookRepository.balanceOf(
@@ -321,6 +360,8 @@ contract BookRepositoryTest is Test {
         uint256 bookId = bookRepository.publish(10, 1 wei, "fake_uri");
 
         //Bob should be able to update his book price
+        vm.expectEmit();
+        emit PriceUpdated(bookId, 2 wei);
         bookRepository.changePrice(bookId, 2 wei);
 
         uint256 newPrice = bookRepository.bookPrice(bookId);
@@ -367,6 +408,9 @@ contract BookRepositoryTest is Test {
         //Expect revert if price is invalid
         if (price <= 0) {
             vm.expectRevert(InvalidPrice.selector);
+        } else {
+            vm.expectEmit();
+            emit PriceUpdated(bookId, price);
         }
 
         bookRepository.changePrice(bookId, price);
@@ -384,6 +428,8 @@ contract BookRepositoryTest is Test {
         uint256 bookId = bookRepository.publish(10, 1 wei, "fake_uri");
 
         //Bob should be able to update his book URI
+        vm.expectEmit();
+        emit URIUpdated(bookId, "new_uri_bob");
         bookRepository.changeURI(bookId, "new_uri_bob");
 
         string memory newURI = bookRepository.uri(1);
