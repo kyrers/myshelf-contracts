@@ -21,6 +21,12 @@ contract BookRepository is
     mapping(uint256 => address) public bookAuthor;
     mapping(uint256 => uint256) public bookPrice;
 
+    event BookBought(address buyer, uint256 bookId, uint256 price);
+    event BookPublished(address author, uint256 bookId, uint256 price);
+    event PriceUpdated(uint256 bookId, uint256 newPrice);
+    event SupplyIncreased(uint256 bookId, uint256 amount, uint256 totalSupply);
+    event URIUpdated(uint256 bookId, string newURI);
+
     error InvalidAmount();
     error InvalidPayment(uint256 price);
     error InvalidPrice();
@@ -76,6 +82,8 @@ contract BookRepository is
 
         _mint(address(this), bookId, amount, "");
         _setURI(bookId, uri);
+
+        emit BookPublished(msg.sender, bookId, price);
     }
 
     /**
@@ -90,6 +98,8 @@ contract BookRepository is
         }
 
         _safeTransferFrom(address(this), msg.sender, bookId, 1, "");
+
+        emit BookBought(msg.sender, bookId, bookPrice[bookId]);
     }
 
     /**
@@ -118,6 +128,8 @@ contract BookRepository is
 
         _mint(address(this), bookId, amount, "");
         _setURI(bookId, uri);
+
+        emit SupplyIncreased(bookId, amount, balanceOf(address(this), bookId));
     }
 
     /**
@@ -130,6 +142,8 @@ contract BookRepository is
         uint256 price
     ) external isPublished(bookId) isAuthor(bookId) isValidPrice(price) {
         bookPrice[bookId] = price;
+
+        emit PriceUpdated(bookId, price);
     }
 
     /**
@@ -142,6 +156,8 @@ contract BookRepository is
         string memory uri
     ) external isPublished(bookId) isAuthor(bookId) {
         _setURI(bookId, uri);
+
+        emit URIUpdated(bookId, uri);
     }
 
     /**
