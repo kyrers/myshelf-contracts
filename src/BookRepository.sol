@@ -21,7 +21,12 @@ contract BookRepository is
     mapping(uint256 => address) public bookAuthor;
     mapping(uint256 => uint256) public bookPrice;
 
-    event BookBought(address buyer, uint256 bookId, uint256 price);
+    event BooksBought(
+        address buyer,
+        uint256 bookId,
+        uint256 amount,
+        uint256 price
+    );
     event BookPublished(address author, uint256 bookId, uint256 price);
     event PriceUpdated(uint256 bookId, uint256 newPrice);
     event SupplyIncreased(uint256 bookId, uint256 amount, uint256 totalSupply);
@@ -31,11 +36,20 @@ contract BookRepository is
     error InvalidPayment(uint256 price);
     error InvalidPrice();
     error NotAuthor();
+    error NotEnoughSupply(uint256 availableAmount);
     error UnpublishedBook();
 
     modifier isAuthor(uint256 bookId) {
         if (msg.sender != bookAuthor[bookId]) {
             revert NotAuthor();
+        }
+        _;
+    }
+
+    modifier isAvailable(uint256 bookId, uint256 amount) {
+        uint256 availableAmount = balanceOf(address(this), bookId);
+        if (amount > availableAmount) {
+            revert NotEnoughSupply(availableAmount);
         }
         _;
     }
@@ -87,19 +101,27 @@ contract BookRepository is
     }
 
     /**
-     * @notice Tansfers one book of type `id` to `msg.sender` if `msg.value` equals the book price
+     * @notice Tansfers `amount` of books of type `id` to `msg.sender` if `msg.value` equals the book price * `amount`
      * @param bookId type `id` of the wanted book
+     * @param amount amount of books wanted
      */
     function buyBook(
-        uint256 bookId
-    ) external payable isPublished(bookId) nonReentrant {
-        if (msg.value != bookPrice[bookId]) {
-            revert InvalidPayment(bookPrice[bookId]);
+        uint256 bookId,
+        uint256 amount
+    )
+        external
+        payable
+        isPublished(bookId)
+        isAvailable(bookId, amount)
+        nonReentrant
+    {
+        if (msg.value != bookPrice[bookId] * amount) {
+            revert InvalidPayment(bookPrice[bookId] * amount);
         }
 
-        _safeTransferFrom(address(this), msg.sender, bookId, 1, "");
+        _safeTransferFrom(address(this), msg.sender, bookId, amount, "");
 
-        emit BookBought(msg.sender, bookId, bookPrice[bookId]);
+        emit BooksBought(msg.sender, bookId, amount, bookPrice[bookId]);
     }
 
     /**
