@@ -14,7 +14,12 @@ contract BookRepositoryTest is Test {
         uint256 value
     );
 
-    event BookBought(address buyer, uint256 bookId, uint256 price);
+    event BooksBought(
+        address buyer,
+        uint256 bookId,
+        uint256 amount,
+        uint256 price
+    );
     event BookPublished(address author, uint256 bookId, uint256 price);
     event PriceUpdated(uint256 bookId, uint256 newPrice);
     event SupplyIncreased(uint256 bookId, uint256 amount, uint256 totalSupply);
@@ -24,6 +29,7 @@ contract BookRepositoryTest is Test {
     error InvalidPayment(uint256 price);
     error InvalidPrice();
     error NotAuthor();
+    error NotEnoughSupply(uint256 availableAmount);
     error UnpublishedBook();
 
     address alice = makeAddr("alice");
@@ -159,22 +165,22 @@ contract BookRepositoryTest is Test {
 
         //Should succeed
         vm.expectEmit();
-        emit BookBought(alice, bobBookId, 1 wei);
-        bookRepository.buyBook{value: 1 wei}(bobBookId);
+        emit BooksBought(alice, bobBookId, 1, 1 wei);
+        bookRepository.buyBook{value: 1 wei}(bobBookId, 1);
 
         vm.expectEmit();
-        emit BookBought(alice, charlieBookId, 2 wei);
-        bookRepository.buyBook{value: 2 wei}(charlieBookId);
+        emit BooksBought(alice, charlieBookId, 2, 2 wei);
+        bookRepository.buyBook{value: 4 wei}(charlieBookId, 2);
 
         uint256 balanceBobBook = bookRepository.balanceOf(alice, 1);
         assertEq(balanceBobBook, 1);
 
         uint256 balanceCharlieBook = bookRepository.balanceOf(alice, 2);
-        assertEq(balanceCharlieBook, 1);
+        assertEq(balanceCharlieBook, 2);
 
-        //Contract should have 3 wei balance
+        //Contract should have 5 wei balance
         uint256 bookRepositoryBalance = address(bookRepository).balance;
-        assertEq(bookRepositoryBalance, 3 wei);
+        assertEq(bookRepositoryBalance, 5 wei);
     }
 
     /// @notice tests that purchases fail if not enough funds are sent
@@ -184,9 +190,13 @@ contract BookRepositoryTest is Test {
 
         uint256 bookId = bookRepository.publish(10, 2 wei, "fake_uri");
 
-        //Should fail because not enough funds were sent
+        //Should fail because not enough funds were sent for 1 book
         vm.expectRevert(abi.encodeWithSelector(InvalidPayment.selector, 2));
-        bookRepository.buyBook{value: 1 wei}(bookId);
+        bookRepository.buyBook{value: 1 wei}(bookId, 1);
+
+        //Should fail because not enough funds were sent 2 books
+        vm.expectRevert(abi.encodeWithSelector(InvalidPayment.selector, 4));
+        bookRepository.buyBook{value: 2 wei}(bookId, 2);
 
         vm.stopPrank();
     }
@@ -198,13 +208,30 @@ contract BookRepositoryTest is Test {
 
         //Should fail because book hasn't been published
         vm.expectRevert(UnpublishedBook.selector);
-        bookRepository.buyBook{value: 1 wei}(1);
+        bookRepository.buyBook{value: 1 wei}(1, 1);
 
         vm.stopPrank();
     }
 
-    /// @notice fuzz test the buy function with different `bookId` and `amount` values
-    function testFuzz_buy(uint256 bookId, uint256 value) public {
+    /// @notice tests that users can't buy unpublished books
+    function test_buy_revertNotEnoughSupply() public {
+        vm.prank(bob);
+        bookRepository.publish(1, 1 wei, "fake_uri");
+
+        vm.prank(alice);
+        vm.deal(alice, 1 ether);
+
+        //Should fail because there's not enough supply of the book
+        vm.expectRevert(abi.encodeWithSelector(NotEnoughSupply.selector, 1));
+        bookRepository.buyBook{value: 2 wei}(1, 2);
+    }
+
+    /// @notice fuzz test the buy function with different `bookId`, `amount`, and values
+    function testFuzz_buy(
+        uint256 bookId,
+        uint256 amount,
+        uint256 value
+    ) public {
         vm.startPrank(bob);
         vm.deal(bob, 10 ether);
         vm.assume(value < 10 ether);
@@ -213,14 +240,21 @@ contract BookRepositoryTest is Test {
 
         if (bookId != 1) {
             vm.expectRevert(UnpublishedBook.selector);
-            bookRepository.buyBook{value: value}(bookId);
-        } else if (value != 2 wei) {
-            vm.expectRevert(abi.encodeWithSelector(InvalidPayment.selector, 2));
-            bookRepository.buyBook{value: value}(bookId);
+            bookRepository.buyBook{value: value}(bookId, amount);
+        } else if (amount > 10) {
+            vm.expectRevert(
+                abi.encodeWithSelector(NotEnoughSupply.selector, 10)
+            );
+            bookRepository.buyBook{value: value}(bookId, amount);
+        } else if (value != amount * 2 wei) {
+            vm.expectRevert(
+                abi.encodeWithSelector(InvalidPayment.selector, amount * 2 wei)
+            );
+            bookRepository.buyBook{value: value}(bookId, amount);
         } else {
             vm.expectEmit();
-            emit BookBought(bob, 1, 2 wei);
-            bookRepository.buyBook{value: value}(bookId);
+            emit BooksBought(bob, 1, amount, 2 wei);
+            bookRepository.buyBook{value: value}(bookId, amount);
         }
 
         vm.stopPrank();
@@ -329,7 +363,8 @@ contract BookRepositoryTest is Test {
             emit SupplyIncreased(
                 bookId,
                 amount,
-                amount + bookRepository.balanceOf(address(bookRepository), bookId)
+                amount +
+                    bookRepository.balanceOf(address(bookRepository), bookId)
             );
 
             bookRepository.increaseSupply(bookId, amount, price, "fake_uri");
